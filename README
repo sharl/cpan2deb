@@ -1,0 +1,19 @@
+cpan2deb - yet another CPAN packager for Ubuntu
+
+Copyright(C) Sharl Morlaroll <sharl@hauN.org>
+
+* License - Perl/Artistic
+
+* Installation
+
+1. cpan2deb copy to /usr/bin/cpan2deb.
+2. rules copy to /usr/share/cpan2deb/rules.
+3. Let's try.
+
+$ mkdir ~/JSON-XS
+$ cd ~/JSON-XS
+$ cpan2deb JSON::XS
+$ cd libjson-xs-perl-*
+$ debuild -uc -us
+
+4. Done.
