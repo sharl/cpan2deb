@@ -1,0 +1,495 @@
+#!/usr/bin/perl
+
+use strict;
+use File::Basename;
+use Getopt::Long;
+use CPAN;
+use File::Path qw(mkpath);
+use File::Copy;
+use YAML;
+use JSON;
+use Archive::Tar;
+use File::Find;
+use Module::Depends;
+use Data::Dumper;
+
+my $VERSION = '1.3.3';
+
+my $MODULE_PREFIX = 'lib';
+my $MODULE_SUFFIX = '-perl';
+
+my $version = undef;
+my $notest  = undef;
+my $manual  = undef;
+
+sub usage {
+    print STDERR "usage: " . basename($0) . " [-v] [-n] [-m] <module name | URL>\n";
+    exit 1;
+}
+GetOptions(
+    "version" => \$version,
+    "notest"  => \$notest,
+    "manual"  => \$manual,
+    );
+if ($version) {
+    print STDERR basename($0) . " " . $VERSION . "\n";
+    exit;
+}
+my ($MODULE) = @ARGV;
+usage() if (! $MODULE);
+
+my $pwd = $ENV{PWD};
+
+my $MODULE_BASE;
+if ($MODULE =~ m,^http://search.cpan.org/CPAN/authors/id/(.*)$,o) {
+    $MODULE_BASE = $MODULE = $1;
+}
+my $mo = CPAN::Shell->expandany($MODULE);
+if (! defined($mo)) {
+    print STDERR "$MODULE missing\n";
+    exit 1;
+}
+
+my ($MODULE_ARC, $MODULE_DIR);
+
+$mo->get();
+
+if (ref($mo) eq 'CPAN::Distribution') {
+    $MODULE_ARC = $CPAN::Config->{keep_source_where} . '/authors/id/' . $MODULE;
+
+    # override module name
+    ($MODULE) = $mo->base_id =~ /^(.*)-[\d\.]*$/o;
+    $MODULE =~ s/-/::/g;
+} else {
+    $MODULE_ARC = $CPAN::Config->{keep_source_where} . '/authors/id/' . $mo->cpan_file;
+}
+$MODULE_DIR = $CPAN::Config->{build_dir} . "/" . (fileparse($MODULE_ARC, qr/\.tar\.gz/o))[0];
+
+my $retry = 0;
+retry_module:;
+my $MODULE_YAML = $MODULE_DIR . "/META.yml";
+my $MODULE_JSON = $MODULE_DIR . "/META.json";
+my $MODULE_NAME = (fileparse($MODULE_ARC, qr/-\d+.*?\.tar\.gz/o))[0];
+
+$MODULE_NAME =~ s/-/::/g;
+if ($MODULE_NAME eq 'perl') {
+    die "\033[1m$MODULE is bundled.\033[m\n";
+}
+
+# LEGACY...
+chdir $pwd;
+
+# Read YAML
+my $yml;
+my $deps;
+my $r = eval { $yml = YAML::LoadFile($MODULE_YAML); };
+if ($r) {
+    print Dumper $yml;
+
+    $deps = Module::Depends->new->dist_dir($MODULE_DIR)->find_modules;
+} elsif (-f $MODULE_JSON) {
+    # YAML のロードに失敗したので JSON を試す
+    open(my $fd, $MODULE_JSON);
+    my @buffer = <$fd>;
+    close($fd);
+    my $json_text = join('', @buffer);
+    my $json = JSON->new->allow_nonref;
+    $yml = $json->decode($json_text);
+
+    print Dumper $yml;
+
+    $deps->{requires} = $yml->{requires};
+    $deps->{build_requires} = $yml->{build_requires};
+} else {
+    # build_dir に YAML があるかもしれないので試す
+
+    my @ymls;
+    find( sub { push @ymls, $File::Find::name }, $CPAN::Config->{build_dir});
+    my $module_tmp = fileparse($MODULE_ARC, qr/\.tar\.gz|\.tgz/o);
+    @ymls = sort grep {/${module_tmp}(-.*\.yml)?$/o} @ymls;
+    if ($#ymls < 0) {
+	print STDERR "\033[1mCannot find $MODULE\'s YAML\033[m\n";
+	exit 1;
+    }
+    $MODULE_DIR = $ymls[0];
+    $MODULE_DIR =~ s/\.yml$//;
+    $MODULE_DIR =~ s/META$//;
+
+    if ($retry > 0) {
+	$yml = parse_Makefile($MODULE_DIR);
+	if ($retry == 1 && $yml) {
+	    goto next_part;
+	} else {
+	    print STDERR "\033[1mCannot find $MODULE's dependencies.\033[m\n";
+	    exit;
+	}
+    }
+
+    $retry++;
+    goto retry_module;
+}
+
+sub parse_Makefile {
+    # Module::Install 対応 XXX FIX ME
+
+    my $module_dir = shift;
+    my $yaml;
+
+    if (-f $module_dir . "/Makefile.PL") {
+	open(my $fd, $module_dir . "/Makefile.PL");
+	my @buffer = map {chomp; $_} <$fd>;
+	close($fd);
+
+	my @yaml_keys = qw(name author license);
+	if (grep {/inc::Module::Install/o} @buffer) {
+	    $yaml->{version} = $mo->cpan_version;
+	    $yaml->{abstract} = $mo->description;
+	    $yaml->{distribution_type} = 'module';
+
+	    foreach (@buffer) {
+		foreach my $key (@yaml_keys) {
+		    if (/^$key.*?'(.*?)'/o) {
+			$yaml->{$key} = $1;
+			last;
+		    }
+		}
+
+		if (/^(build_depends|test_requires).*?'(.*?)'.*?(=>.*?(.*))?;/o) {
+		    my ($mod, $ver) = ($1, $3);
+		    $ver = 0 if ($ver !~ /\d/o);
+		    $deps->{build_requires} = {$mod => $ver};
+		} else {
+		    $deps->{build_requires} = {};
+		}
+		if (/^requires.*?'(.*?)'.*?(=>.*?(.*))?;/o) {
+		    my ($mod, $ver) = ($1, $3);
+		    $ver = 0 if ($ver !~ /\d/o);
+		    $deps->{requires} = {$mod => $ver};
+		} else {
+		    $deps->{requires} = {};
+		}
+	    }
+	}
+    }
+    $yaml;
+}
+
+next_part:;
+############################################################
+# get architecture
+############################################################
+my @xs;
+find( sub { push @xs, $File::Find::name }, $MODULE_DIR);
+@xs = grep {/\.xs$/o} @xs;
+my $ARCHITECTURE = ($#xs >= 0) ? 'any' : 'all';
+
+############################################################
+# make .orig.tar.gz
+############################################################
+$yml->{name} =~ s/_/-/g;
+
+my $base_dir = $MODULE_PREFIX . lc($yml->{name}) . $MODULE_SUFFIX . "-" . $yml->{version};
+if ($yml->{name} =~ /^$MODULE_PREFIX.*$MODULE_SUFFIX/o) {
+    $base_dir = lc($yml->{name}) . "-" . $yml->{version};
+} elsif (lc($yml->{name}) =~ /^$MODULE_PREFIX/o) {
+    $base_dir = lc($yml->{name}) . $MODULE_SUFFIX . "-" . $yml->{version};
+}
+my $upstream_dir = $base_dir . "/upstream/" ;
+
+# LEGACY...
+chdir $pwd;
+
+if (! -d $upstream_dir) {
+    eval { mkpath $upstream_dir; };
+    if ($@) {
+	print STDERRR $@;
+	exit 1;
+    }
+}
+
+copy($MODULE_ARC, $upstream_dir) or die $!;
+
+my $orig_tar_gz_file = $MODULE_PREFIX . lc($yml->{name}) . $MODULE_SUFFIX . "_" . $yml->{version} . ".orig.tar.gz";
+if ($yml->{name} =~ /^$MODULE_PREFIX.*$MODULE_SUFFIX/o) {
+    $orig_tar_gz_file = lc($yml->{name}) . "_" . $yml->{version} . ".orig.tar.gz";
+} elsif (lc($yml->{name}) =~ /^lib/o) {
+    $orig_tar_gz_file = lc($yml->{name}) . $MODULE_SUFFIX . "_" . $yml->{version} . ".orig.tar.gz";
+}
+
+if (! -f $orig_tar_gz_file) {
+    my $tar = Archive::Tar->new;
+    my @files;
+    find( sub { push @files, $File::Find::name }, $base_dir);
+    $tar->add_files(@files);
+    $tar->write($orig_tar_gz_file, 9);
+}
+
+############################################################
+# run dh_make
+############################################################
+my $MODULE_FILENAME = $MODULE_PREFIX . lc($yml->{name}) . $MODULE_SUFFIX;
+if ($yml->{name} =~ /^$MODULE_PREFIX.*$MODULE_SUFFIX/o) {
+    $MODULE_FILENAME = lc($yml->{name});
+} elsif (lc($yml->{name}) =~ /^lib/o) {
+    $MODULE_FILENAME = lc($yml->{name}) . $MODULE_SUFFIX;
+}
+my $MODULE_VERSION = $yml->{version};
+my $MODULE_MAKE;
+my $MODULE_BUILD;
+my $MODULE_INSTALL;
+my $MANUAL_INSTALL = undef;
+if ($yml->{generated_by} =~ /Module::Build/o) {
+    $MODULE_MAKE    = 'Build.PL --prefix /usr --bindoc /usr/share --libdoc /usr/share --installdirs vendor';
+    if ($notest) {
+	$MODULE_BUILD   = '(cd $(BUILDDIR); ./Build)';
+    } else {
+	$MODULE_BUILD   = '(cd $(BUILDDIR); ./Build; ./Build test)';
+    }
+    $MODULE_INSTALL = '(cd $(BUILDDIR); ./Build install --installdirs vendor --destdir $(CURDIR)/debian/$(PACKAGE))';
+} else {
+    $MODULE_MAKE    = 'Makefile.PL installdirs=vendor';
+    if ($notest) {
+	$MODULE_BUILD   = '$(MAKE) -C $(BUILDDIR)';
+    } else {
+	$MODULE_BUILD   = '$(MAKE) -C $(BUILDDIR); $(MAKE) -C $(BUILDDIR) test';
+    }
+    $MODULE_INSTALL = '$(MAKE) -C $(BUILDDIR) install DESTDIR=$(CURDIR)/debian/$(PACKAGE) INSTALLDIRS=vendor';
+}
+if ($manual) {
+    $MANUAL_INSTALL  = 'mkdir -p $(CURDIR)/debian/$(PACKAGE)-man/usr/share; ';
+    $MANUAL_INSTALL .= 'mv $(CURDIR)/debian/$(PACKAGE)/usr/share/man $(CURDIR)/debian/$(PACKAGE)-man/usr/share';
+}
+
+# Check description 
+if (! $yml->{abstract}) {
+    $yml->{abstract} = "$MODULE perl $yml->{distribution_type}";
+}
+
+chdir $base_dir;
+my @licenses = qw(gpl lgpl artistic bsd);
+my $license = $yml->{license} eq 'perl' ? 'artistic' : $yml->{license};
+
+if (! grep /$license/, @licenses) {
+    $license = 'artistic';
+}
+
+system "yes | dh_make -s -c \"$license\" -f ../$orig_tar_gz_file";
+
+my @rm_files = qw(
+README.Debian
+cron.d.ex
+dirs
+docs
+emacsen-install.ex
+emacsen-remove.ex
+emacsen-startup.ex
+init.d.ex
+init.d.lsb.ex
+manpage.1.ex
+manpage.sgml.ex
+manpage.xml.ex
+menu.ex
+postinst.ex
+postrm.ex
+preinst.ex
+prerm.ex
+watch.ex
+);
+foreach my $rm_file (@rm_files) {
+    unlink "debian/" . $rm_file;
+}
+unlink "debian/$MODULE_FILENAME-default.ex";
+unlink "debian/$MODULE_FILENAME.doc-base.EX";
+
+################
+# change rules #
+################
+chdir $pwd;
+open(my $fd, "/usr/share/cpan2deb/rules") || die $!;
+my @buffer = <$fd>;
+close($fd);
+foreach my $line (@buffer) {
+    $line =~ s/__PREFIX__/$MODULE_PREFIX/g;
+    $line =~ s/__SUFFIX__/$MODULE_SUFFIX/g;
+    $line =~ s/__MODULE__/$MODULE_NAME/g;
+
+    $line =~ s/__MODULE_MAKE__/$MODULE_MAKE/g;
+    $line =~ s/__MODULE_BUILD__/$MODULE_BUILD/g;
+    $line =~ s/__MODULE_INSTALL__/$MODULE_INSTALL/g;
+    $line =~ s/__MANUAL_INSTALL__/$MANUAL_INSTALL/g;
+}
+my $buffer = join('', @buffer);
+
+open(my $fd, '>', $base_dir . "/debian/rules");
+print $fd $buffer;
+close($fd);
+
+##################
+# change control #
+##################
+my $Build_Depends = ();
+if ($deps->{build_requires}) {
+    $Build_Depends = $deps->{build_requires};
+} elsif ($deps->build_requires) {
+    $Build_Depends = $deps->build_requires;
+}
+$Build_Depends = lex_depends($Build_Depends);
+warn "Build-Depends: " . $Build_Depends . "\n" if $Build_Depends;
+
+my $Depends = ();
+if ($deps->{requires}) {
+    $Depends = $deps->{requires};
+} elsif ($deps->requires) {
+    $Depends = $deps->requires;
+}
+$Depends = lex_depends($Depends);
+if (! $Depends) {
+    $Depends = 'perl';
+}
+warn "Depends: " . $Depends . "\n";
+
+if ($yml->{recommends}) {
+    my $Recommends = 'Recommends: ' . lex_depends($yml->{recommends});
+    warn $Recommends . "\n";
+    $Depends .= "\n" . $Recommends;
+}
+
+sub lex_depends {
+    my $Depends = shift;
+
+    my %Depends = ();
+    foreach my $module (sort keys %$Depends) {
+	my $mod = $module;
+	if ($mod ne 'perl') {
+	    my $locate = $mod;
+	    $locate =~ s|::|/|g;
+	    $locate .= '.pm';
+	    my @loc = split(/\n/, `locate $locate`);
+	    foreach my $loc (@loc) {
+		if ($loc =~ m|^/usr/lib/perl/[\d\.]+/$locate| || $loc =~ m|^/usr/share/perl/[\d\.]+/$locate|) {
+		    goto skip;
+		}
+	    }
+
+	    my $file = CPAN::Shell->expand("Module", $mod)->cpan_file;
+	    $file = basename($file);
+	    $file =~ s/-\d+.*?\.tar\.gz$//;
+	    $file =~ s/_//g;
+
+	    if ($file ne 'perl') {
+		if ($file !~ /^$MODULE_PREFIX/o) {
+		    $mod = $MODULE_PREFIX . lc($file);
+		} else {
+		    $mod = lc($file);
+		}
+		if ($MODULE_SUFFIX && $file !~ /$MODULE_SUFFIX$/o) {
+		    $mod .= $MODULE_SUFFIX;
+		}
+
+		my $class = $file;
+		$class =~ s/^$MODULE_PREFIX//;
+		$class =~ s/$MODULE_SUFFIX$//;
+		$class =~ s/-/::/g;
+		if ($module ne $class && $Depends->{$module}) {
+		    warn "\033[1mCheck $module version - $file\033[m\n";
+		}
+
+		if ($Depends->{$module}) {
+		    $Depends{$mod} = "(>= $Depends->{$module})";
+		} else {
+		    $Depends{$mod} ||= undef;
+		}
+	    }
+	} else {
+	    if ($Depends->{$module}) {
+		# ad hoc: perl version to human readable
+		if (my @ver = $Depends->{$module} =~ /(\d+)\.(\d{3})(\d{3})?$/o) {
+		    $Depends->{$module} = join('.', map {s/^0+(\d+)$/$1/; $_ ||= 0} @ver);
+		}
+		$Depends{$mod} = "(>= $Depends->{$module})";
+	    } else {
+		$Depends{$mod} ||= undef;
+	    }
+	}
+      skip:
+    }
+
+    my @Depends = ();
+    foreach my $mod (keys %Depends) {
+	my $d = $mod;
+	if ($Depends{$mod}) {
+	    $d .= " $Depends{$mod}";
+	}
+
+	push @Depends, $d;
+    }
+    $Depends = join(", ", @Depends);
+    $Depends;
+}
+
+open(my $fd, $base_dir . "/debian/control") || die $!;
+my @buffer = <$fd>;
+close($fd);
+
+my $distribution_type = $yml->{distribution_type};
+foreach my $lines (@buffer) {
+    $lines =~ s/^(Section): unknown/$1: perl/;
+    $lines =~ s/^(Build-Depends: .*)$/$1, $Build_Depends/ if $Build_Depends;
+    $lines =~ s/^(Architecture): .*$/$1: $ARCHITECTURE/;
+    $lines =~ s/^(Depends): .*$/$1: $Depends/;
+    $lines =~ s/^(Description): .*$/$1: $yml->{abstract}/;
+    $lines =~ s/^ <insert long description, indented with spaces>/ This package provides $MODULE perl $distribution_type./;
+}
+my $buffer = join('', @buffer);
+if ($manual) {
+    $buffer .= <<EOF;
+
+Package: ${MODULE_FILENAME}-man
+Architecture: all
+Depends: man
+Description: Manual of $MODULE
+ This package provides $MODULE perldoc manual.
+EOF
+;
+}
+
+open(my $fd, '>', $base_dir . "/debian/control");
+print $fd $buffer;
+close($fd);
+
+####################
+# change copyright #
+####################
+open(my $fd, $base_dir . "/debian/copyright") || die $!;
+my @buffer = <$fd>;
+close($fd);
+
+my $dl_file;
+if (ref($mo) eq 'CPAN::Distribution') {
+    $dl_file = 'http://search.cpan.org/CPAN/authors/id/' . $MODULE_BASE;
+} else {
+    $dl_file = (fileparse('http://search.cpan.org/CPAN/authors/id/' . $mo->cpan_file))[1];
+}
+my @resources = ();
+foreach my $key (keys %{$yml->{resources}}) {
+    push @resources, "$key $yml->{resources}->{$key}";
+}
+my $resources = join("\n", @resources);
+foreach my $lines (@buffer) {
+    if ($resources) {
+	$lines =~ s,<(url://example.com|fill in ftp site)>,<$dl_file>\n\n$resources,;
+    } else {
+	$lines =~ s,<(url://example.com|fill in ftp site)>,<$dl_file>,;
+    }
+}
+my $buffer = join('', @buffer);
+my $authors = ref($yml->{author}) eq 'ARRAY' ? join("\n", @{$yml->{author}}) : $yml->{author};
+if ($authors) {
+    $buffer =~ s/<put author(\'s|\(s\)) name and email here>(.*?<likewise for another author>)?/$authors/s;
+    $buffer =~ s/Copyright: \n\n\s+?<Copyright \(C\) YYYY Name OfAuthor>.*?<likewise for another author>\n\n//s;
+} else {
+    warn "\033[1mAuthors is not defined.\033[m\n";
+}
+open(my $fd, '>', $base_dir . "/debian/copyright");
+print $fd $buffer;
+close($fd);
