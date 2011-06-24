@@ -13,7 +13,7 @@ use File::Find;
 use Module::Depends;
 use Data::Dumper;
 
-my $VERSION = '1.3.3';
+my $VERSION = '1.3.4';
 
 my $MODULE_PREFIX = 'lib';
 my $MODULE_SUFFIX = '-perl';
@@ -321,6 +321,21 @@ foreach my $line (@buffer) {
 my $buffer = join('', @buffer);
 
 open(my $fd, '>', $base_dir . "/debian/rules");
+print $fd $buffer;
+close($fd);
+
+####################
+# modify changelog #
+####################
+open(my $fd, $base_dir . "/debian/changelog");
+my @buffer = <$fd>;
+close($fd);
+foreach my $line (@buffer) {
+    $line =~ s/(Initial release).*/$1/;
+}
+my $buffer = join('', @buffer);
+
+open(my $fd, '>', $base_dir . "/debian/changelog");
 print $fd $buffer;
 close($fd);
 
