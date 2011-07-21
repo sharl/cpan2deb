@@ -277,6 +277,7 @@ system "yes | dh_make -s -c \"$license\" -f ../$orig_tar_gz_file";
 
 my @rm_files = qw(
 README.Debian
+README.source
 cron.d.ex
 dirs
 docs
