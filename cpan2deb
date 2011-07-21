@@ -106,13 +106,13 @@ if ($r) {
     my @ymls;
     find( sub { push @ymls, $File::Find::name }, $CPAN::Config->{build_dir});
     my $module_tmp = fileparse($MODULE_ARC, qr/\.tar\.gz|\.tgz/o);
-    @ymls = sort grep {/${module_tmp}(-.*\.yml)?$/o} @ymls;
+    @ymls = sort grep {/${module_tmp}(-.*\.(yml|json))?$/o} @ymls;
     if ($#ymls < 0) {
 	print STDERR "\033[1mCannot find $MODULE\'s YAML\033[m\n";
 	exit 1;
     }
     $MODULE_DIR = $ymls[0];
-    $MODULE_DIR =~ s/\.yml$//;
+    $MODULE_DIR =~ s/\.(yml|json)$//;
     $MODULE_DIR =~ s/META$//;
 
     if ($retry > 0) {
@@ -299,6 +299,7 @@ foreach my $rm_file (@rm_files) {
     unlink "debian/" . $rm_file;
 }
 unlink "debian/$MODULE_FILENAME-default.ex";
+unlink "debian/$MODULE_FILENAME.default.ex";
 unlink "debian/$MODULE_FILENAME.doc-base.EX";
 
 ################
@@ -454,6 +455,7 @@ foreach my $lines (@buffer) {
     $lines =~ s/^(Depends): .*$/$1: $Depends/;
     $lines =~ s/^(Description): .*$/$1: $yml->{abstract}/;
     $lines =~ s/^ <insert long description, indented with spaces>/ This package provides $MODULE perl $distribution_type./;
+    $lines =~ s/^Homepage: <insert the upstream URL, if relevant>//;
 }
 my $buffer = join('', @buffer);
 if ($manual) {
