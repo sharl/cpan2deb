@@ -49,11 +49,9 @@ if (! defined($mo)) {
     print STDERR "$MODULE missing\n";
     exit 1;
 }
-
-my ($MODULE_ARC, $MODULE_DIR);
-
 $mo->get();
 
+my $MODULE_ARC;
 if (ref($mo) eq 'CPAN::Distribution') {
     $MODULE_ARC = $CPAN::Config->{keep_source_where} . '/authors/id/' . $MODULE;
 
@@ -63,7 +61,7 @@ if (ref($mo) eq 'CPAN::Distribution') {
 } else {
     $MODULE_ARC = $CPAN::Config->{keep_source_where} . '/authors/id/' . $mo->cpan_file;
 }
-$MODULE_DIR = $CPAN::Config->{build_dir} . "/" . (fileparse($MODULE_ARC, qr/\.tar\.gz/o))[0];
+my $MODULE_DIR = $CPAN::Config->{build_dir} . "/" . (fileparse($MODULE_ARC, qr/\.tar\.gz/o))[0];
 
 my $retry = 0;
 retry_module:;
@@ -108,7 +106,7 @@ if ($r) {
     my $module_tmp = fileparse($MODULE_ARC, qr/\.tar\.gz|\.tgz/o);
     @ymls = sort grep {/${module_tmp}(-.*\.(yml|json))?$/o} @ymls;
     if ($#ymls < 0) {
-	print STDERR "\033[1mCannot find $MODULE\'s YAML\033[m\n";
+	print STDERR "\033[1mCannot find $MODULE\'s YAML or JSON\033[m\n";
 	exit 1;
     }
     $MODULE_DIR = $ymls[0];
@@ -456,9 +454,13 @@ foreach my $lines (@buffer) {
     $lines =~ s/^(Depends): .*$/$1: $Depends/;
     $lines =~ s/^(Description): .*$/$1: $yml->{abstract}/;
     $lines =~ s/^ <insert long description, indented with spaces>/ This package provides $MODULE perl $distribution_type./;
-    $lines =~ s/^Homepage: <insert the upstream URL, if relevant>//;
 }
 my $buffer = join('', @buffer);
+if ($yml->{resources}->{homepage}) {
+    $buffer =~ s/(Homepage): <insert the upstream URL, if relevant>/$1: $yml->{resources}->{homepage}/;
+} else {
+    $buffer =~ s/Homepage: <insert the upstream URL, if relevant>\n//;
+}
 if ($manual) {
     $buffer .= <<EOF;
 
