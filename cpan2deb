@@ -506,10 +506,11 @@ my $buffer = join('', @buffer);
 my $authors = ref($yml->{author}) eq 'ARRAY' ? join("\n", @{$yml->{author}}) : $yml->{author};
 if ($authors) {
     $buffer =~ s/<put author(\'s|\(s\)) name and email here>(.*?<likewise for another author>)?/$authors/s;
-    $buffer =~ s/Copyright: \n\n\s+?<Copyright \(C\) YYYY Name OfAuthor>.*?<likewise for another author>\n\n//s;
+    $buffer =~ s/Copyright:\s*\n\n\s+?<Copyright \(C\) YYYY Name OfAuthor>.*?<likewise for another author>\n\n//s;
 } else {
     warn "\033[1mAuthors is not defined.\033[m\n";
 }
+$buffer =~ s/\n# Please also look if there.*$//s;
 open(my $fd, '>', $base_dir . "/debian/copyright");
 print $fd $buffer;
 close($fd);
