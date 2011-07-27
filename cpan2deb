@@ -451,7 +451,7 @@ foreach my $lines (@buffer) {
     $lines =~ s/^(Section): unknown/$1: perl/;
     $lines =~ s/^(Build-Depends: .*)$/$1, $Build_Depends/ if $Build_Depends;
     $lines =~ s/^(Architecture): .*$/$1: $ARCHITECTURE/;
-    $lines =~ s/^(Depends): .*$/$1: $Depends/;
+    $lines =~ s/^(Depends): .*$/$1: \${perl:Depends}, \${shlibs:Depends}, \${misc:Depends}, $Depends/;
     $lines =~ s/^(Description): .*$/$1: $yml->{abstract}/;
     $lines =~ s/^ <insert long description, indented with spaces>/ This package provides $MODULE perl $distribution_type./;
 }
@@ -510,7 +510,7 @@ if ($authors) {
 } else {
     warn "\033[1mAuthors is not defined.\033[m\n";
 }
-$buffer =~ s/\n# Please also look if there.*$//s;
+$buffer =~ s/\n\# Please also look if there.*$//s;
 open(my $fd, '>', $base_dir . "/debian/copyright");
 print $fd $buffer;
 close($fd);
