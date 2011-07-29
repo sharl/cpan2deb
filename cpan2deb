@@ -319,6 +319,10 @@ foreach my $line (@buffer) {
     $line =~ s/__MANUAL_INSTALL__/$MANUAL_INSTALL/g;
 }
 my $buffer = join('', @buffer);
+if ($ARCHITECTURE eq 'all') {
+    $buffer =~ s/(\# Build architecture-)in(dependent files here.\nbinary-)indep(: build install\n\# We have nothing to do by default.)/$1$2arch$3/so;
+    $buffer =~ s/(\# Build architecture-)(dependent files here.\nbinary-)arch(: build install)\n\tdh_testdir/$1in$2indep$3/so;
+}
 
 open(my $fd, '>', $base_dir . "/debian/rules");
 print $fd $buffer;
