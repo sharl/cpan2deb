@@ -236,7 +236,7 @@ my $MODULE_MAKE;
 my $MODULE_BUILD;
 my $MODULE_INSTALL;
 my $MANUAL_INSTALL = undef;
-if ($yml->{generated_by} =~ /Module::Build/o) {
+if ($yml->{generated_by} =~ /Module::Build/o || exists $yml->{build_requires}->{'Module::Build'}) {
     $MODULE_MAKE    = 'Build.PL --prefix /usr --bindoc /usr/share --libdoc /usr/share --installdirs vendor';
     if ($notest) {
 	$MODULE_BUILD   = '(cd $(BUILDDIR); ./Build)';
