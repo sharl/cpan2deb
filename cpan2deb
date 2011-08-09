@@ -451,11 +451,14 @@ my @buffer = <$fd>;
 close($fd);
 
 my $distribution_type = $yml->{distribution_type};
+my $tmp_depends = $ARCHITECTURE eq 'any'
+    ? "\${perl:Depends}, \${shlibs:Depends}, \${misc:Depends}, $Depends"
+    : "\${perl:Depends}, \${misc:Depends}, $Depends";
 foreach my $lines (@buffer) {
     $lines =~ s/^(Section): unknown/$1: perl/;
     $lines =~ s/^(Build-Depends: .*)$/$1, $Build_Depends/ if $Build_Depends;
     $lines =~ s/^(Architecture): .*$/$1: $ARCHITECTURE/;
-    $lines =~ s/^(Depends): .*$/$1: \${perl:Depends}, \${shlibs:Depends}, \${misc:Depends}, $Depends/;
+    $lines =~ s/^(Depends): .*$/$1: $tmp_depends/;
     $lines =~ s/^(Description): .*$/$1: $yml->{abstract}/;
     $lines =~ s/^ <insert long description, indented with spaces>/ This package provides $MODULE perl $distribution_type./;
 }
