@@ -334,13 +334,26 @@ close($fd);
 open(my $fd, $base_dir . "/debian/changelog");
 my @buffer = <$fd>;
 close($fd);
+
+my $codename = (split(/:/, `lsb_release -c`))[1];
+$codename =~ s/\s+//g;
+
 foreach my $line (@buffer) {
+    $line =~ s/^$MODULE_FILENAME \($yml->{version}-1\) unstable/$MODULE_FILENAME ($yml->{version}-0ubuntu1) $codename/;
     $line =~ s/(Initial release).*/$1/;
 }
 my $buffer = join('', @buffer);
 
 open(my $fd, '>', $base_dir . "/debian/changelog");
 print $fd $buffer;
+close($fd);
+
+########################
+# create source/format #
+########################
+mkdir $base_dir . '/debian/source', 0755;
+open(my $fd, '>', $base_dir . "/debian/source/format");
+print $fd "1.0\n";
 close($fd);
 
 ##################
