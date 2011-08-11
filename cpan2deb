@@ -110,8 +110,7 @@ if ($r) {
 	exit 1;
     }
     $MODULE_DIR = $ymls[0];
-    $MODULE_DIR =~ s/\.(yml|json)$//;
-    $MODULE_DIR =~ s/META$//;
+    $MODULE_DIR =~ s/META\.(yml|json)$//;
 
     if ($retry > 0) {
 	$yml = parse_Makefile($MODULE_DIR);
@@ -393,15 +392,8 @@ sub lex_depends {
     foreach my $module (sort keys %$Depends) {
 	my $mod = $module;
 	if ($mod ne 'perl') {
-	    my $locate = $mod;
-	    $locate =~ s|::|/|g;
-	    $locate .= '.pm';
-	    my @loc = split(/\n/, `locate $locate`);
-	    foreach my $loc (@loc) {
-		if ($loc =~ m|^/usr/lib/perl/[\d\.]+/$locate| || $loc =~ m|^/usr/share/perl/[\d\.]+/$locate|) {
-		    goto skip;
-		}
-	    }
+	    my $is_core = `corelist $module`;
+	    goto skip if ($is_core !~ /not in CORE/o);
 
 	    my $file = CPAN::Shell->expand("Module", $mod)->cpan_file;
 	    $file = basename($file);
