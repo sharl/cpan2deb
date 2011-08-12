@@ -105,7 +105,7 @@ if ($r) {
 	    goto next_part;
 	} else {
 	    print STDERR "\033[1mCannot find $MODULE's dependencies.\033[m\n";
-	    exit;
+	    exit 1;
 	}
     }
 
