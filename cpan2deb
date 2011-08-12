@@ -380,9 +380,11 @@ if (! $Depends) {
 warn "Depends: " . $Depends . "\n";
 
 if ($yml->{recommends}) {
-    my $Recommends = 'Recommends: ' . lex_depends($yml->{recommends});
-    warn $Recommends . "\n";
-    $Depends .= "\n" . $Recommends;
+    if (my $rec = lex_depends($yml->{recommends})) {
+	my $Recommends = 'Recommends: ' . $rec;
+	warn $Recommends . "\n";
+	$Depends .= "\n" . $Recommends;
+    }
 }
 
 sub lex_depends {
