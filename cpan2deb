@@ -6,8 +6,7 @@ use Getopt::Long;
 use CPAN;
 use File::Path qw(mkpath);
 use File::Copy;
-use YAML;
-use JSON;
+use Parse::CPAN::Meta;
 use Archive::Tar;
 use File::Find;
 use Module::Depends;
@@ -77,29 +76,17 @@ if ($MODULE_NAME eq 'perl') {
 # LEGACY...
 chdir $pwd;
 
-# Read YAML
+# Read META
 my $yml;
 my $deps;
-my $r = eval { $yml = YAML::LoadFile($MODULE_YAML); };
+my $meta = (-f $MODULE_YAML) ? $MODULE_YAML : $MODULE_JSON;
+my $r = eval { $yml = Parse::CPAN::Meta->load_file($meta); };
 if ($r) {
     print Dumper $yml;
 
     $deps = Module::Depends->new->dist_dir($MODULE_DIR)->find_modules;
-} elsif (-f $MODULE_JSON) {
-    # YAML のロードに失敗したので JSON を試す
-    open(my $fd, $MODULE_JSON);
-    my @buffer = <$fd>;
-    close($fd);
-    my $json_text = join('', @buffer);
-    my $json = JSON->new->allow_nonref;
-    $yml = $json->decode($json_text);
-
-    print Dumper $yml;
-
-    $deps->{requires} = $yml->{requires};
-    $deps->{build_requires} = $yml->{build_requires};
 } else {
-    # build_dir に YAML があるかもしれないので試す
+    # build_dir に META があるかもしれないので試す
 
     my @ymls;
     find( sub { push @ymls, $File::Find::name }, $CPAN::Config->{build_dir});
