@@ -244,9 +244,13 @@ if ($manual) {
     $MANUAL_INSTALL .= 'mv $(CURDIR)/debian/$(PACKAGE)/usr/share/man $(CURDIR)/debian/$(PACKAGE)-man/usr/share';
 }
 
-# Check description 
-if (! $yml->{abstract}) {
-    $yml->{abstract} = "$MODULE perl $yml->{distribution_type}";
+# Check distribution type and description
+my $distribution_type = $yml->{distribution_type};
+if (! $distribution_type || $distribution_type eq 'unknown') {
+    $distribution_type = 'module';
+}
+if (! $yml->{abstract} || $yml->{abstract} eq 'unknown') {
+    $yml->{abstract} = "$MODULE perl $distribution_type";
 }
 
 chdir $base_dir;
@@ -361,10 +365,6 @@ if ($deps->{requires}) {
     $Depends = $deps->requires;
 }
 $Depends = lex_depends($Depends);
-if (! $Depends) {
-    $Depends = 'perl';
-}
-warn "Depends: " . $Depends . "\n";
 
 if ($yml->{recommends}) {
     if (my $rec = lex_depends($yml->{recommends})) {
@@ -444,10 +444,11 @@ open(my $fd, $base_dir . "/debian/control") || die $!;
 my @buffer = <$fd>;
 close($fd);
 
-my $distribution_type = $yml->{distribution_type};
 my $tmp_depends = $ARCHITECTURE eq 'any'
     ? "\${perl:Depends}, \${shlibs:Depends}, \${misc:Depends}, $Depends"
     : "\${perl:Depends}, \${misc:Depends}, $Depends";
+$tmp_depends =~ s/, $//;
+warn "Depends: " . $tmp_depends . "\n";
 foreach my $lines (@buffer) {
     $lines =~ s/^(Section): unknown/$1: perl/;
     $lines =~ s/^(Build-Depends: .*)$/$1, $Build_Depends/ if $Build_Depends;
@@ -505,7 +506,7 @@ foreach my $lines (@buffer) {
 }
 my $buffer = join('', @buffer);
 my $authors = ref($yml->{author}) eq 'ARRAY' ? join("\n", @{$yml->{author}}) : $yml->{author};
-if ($authors) {
+if ($authors && $authors ne 'unknown') {
     $buffer =~ s/<put author(\'s|\(s\)) name and email here>(.*?<likewise for another author>)?/$authors/s;
     $buffer =~ s/Copyright:\s*\n\n\s+?<Copyright \(C\) YYYY Name OfAuthor>.*?<likewise for another author>\n\n//s;
 } else {
