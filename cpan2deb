@@ -372,7 +372,6 @@ $Depends = lex_depends($Depends);
 if ($yml->{recommends}) {
     if (my $rec = lex_depends($yml->{recommends})) {
 	my $Recommends = 'Recommends: ' . $rec;
-	warn $Recommends . "\n";
 	$Depends .= "\n" . $Recommends;
     }
 }
