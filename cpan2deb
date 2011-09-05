@@ -12,7 +12,7 @@ use File::Find;
 use Module::Depends;
 use Data::Dumper;
 
-my $VERSION = '1.3.7';
+my $VERSION = '1.3.8';
 
 my $MODULE_PREFIX = 'lib';
 my $MODULE_SUFFIX = '-perl';
@@ -22,10 +22,11 @@ my $RULES = '/usr/share/cpan2deb/rules';
 my $version = undef;
 my $notest  = undef;
 my $manual  = undef;
+my $quilt   = undef;
 my @authors = ();
 
 sub usage {
-    print STDERR "usage: " . basename($0) . " [-v] [-n] [-m] [-r <rules file>] [-a author] <module name | URL>\n";
+    print STDERR "usage: " . basename($0) . " [-v] [-n] [-m] [-q] [-r <rules file>] [-a author] <module name | URL>\n";
     exit 1;
 }
 GetOptions(
@@ -33,6 +34,7 @@ GetOptions(
     "notest"   => \$notest,
     "manual"   => \$manual,
     "rules=s"  => \$RULES,  
+    "quilt"    => \$quilt,
     "author=s" => \@authors,
     );
 if ($version) {
@@ -348,7 +350,11 @@ close($fd);
 ########################
 mkdir $base_dir . '/debian/source', 0755;
 open(my $fd, '>', $base_dir . "/debian/source/format");
-print $fd "1.0\n";
+if ($quilt) {
+    print $fd "3.0 (quilt)\n";
+} else {
+    print $fd "1.0\n";
+}
 close($fd);
 
 ##################
