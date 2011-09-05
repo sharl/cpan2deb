@@ -516,7 +516,7 @@ foreach my $lines (@buffer) {
 }
 my $buffer = join('', @buffer);
 my $authors = ref($yml->{author}) eq 'ARRAY' ? join("\n", @{$yml->{author}}) : $yml->{author};
-if (! $authors && $#authors >= 0) {
+if ($#authors >= 0) {
     $authors = join("\n", @authors);
 }
 if ($authors && $authors ne 'unknown') {
