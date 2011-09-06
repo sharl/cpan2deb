@@ -515,9 +515,9 @@ foreach my $lines (@buffer) {
     }
 }
 my $buffer = join('', @buffer);
-my $authors = ref($yml->{author}) eq 'ARRAY' ? join("\n", @{$yml->{author}}) : $yml->{author};
+my $authors = ref($yml->{author}) eq 'ARRAY' ? join("\n    ", @{$yml->{author}}) : $yml->{author};
 if ($#authors >= 0) {
-    $authors = join("\n", @authors);
+    $authors = join("\n    ", @authors);
 }
 if ($authors && $authors ne 'unknown') {
     $buffer =~ s/<put author(\'s|\(s\)) name and email here>(.*?<likewise for another author>)?/$authors/s;
