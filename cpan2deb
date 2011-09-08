@@ -69,6 +69,9 @@ if (ref($mo) eq 'CPAN::Distribution') {
 }
 my $MODULE_DIR = $CPAN::Config->{build_dir} . "/" . (fileparse($MODULE_ARC, qr/\.tar\.gz/o))[0];
 
+# LEGACY...
+chdir $pwd;
+
 my $retry = 0;
 retry_module:;
 my $MODULE_YAML = $MODULE_DIR . "/META.yml";
@@ -79,9 +82,6 @@ $MODULE_NAME =~ s/-/::/g;
 if ($MODULE_NAME eq 'perl') {
     die "\033[1m$MODULE is bundled.\033[m\n";
 }
-
-# LEGACY...
-chdir $pwd;
 
 # Read META
 my $yml;
@@ -392,7 +392,7 @@ sub lex_depends {
 	my $mod = $module;
 	if ($mod ne 'perl') {
 	    my $is_core = `corelist $module`;
-	    goto skip if ($is_core !~ /not in CORE/o);
+	    next if ($is_core !~ /not in CORE/o);
 
 	    my $file = CPAN::Shell->expand("Module", $mod)->cpan_file;
 	    $file = basename($file);
@@ -434,7 +434,6 @@ sub lex_depends {
 		$Depends{$mod} ||= undef;
 	    }
 	}
-      skip:
     }
 
     my @Depends = ();
