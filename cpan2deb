@@ -307,7 +307,7 @@ close($fd);
 my $tmp_depends = $ARCHITECTURE eq 'any'
     ? "\${perl:Depends}, \${shlibs:Depends}, \${misc:Depends}, $Depends"
     : "\${perl:Depends}, \${misc:Depends}, $Depends";
-$tmp_depends =~ s/, $//;
+$tmp_depends =~ s/, \n/\n/s;
 warn "Depends: " . $tmp_depends . "\n";
 foreach my $lines (@buffer) {
     $lines =~ s/^(Section): unknown/$1: perl/;
