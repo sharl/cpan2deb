@@ -12,7 +12,7 @@ use File::Find;
 use Module::Depends;
 use Data::Dumper;
 
-my $VERSION = '1.3.8';
+my $VERSION = '1.3.9';
 
 my $MODULE_PREFIX = 'lib';
 my $MODULE_SUFFIX = '-perl';
@@ -57,7 +57,7 @@ if (! defined($mo)) {
 }
 $mo->get();
 
-my $MODULE_ARC;
+my ($yml, $deps, $MODULE_DIR, $MODULE_NAME, $MODULE_ARC);
 if (ref($mo) eq 'CPAN::Distribution') {
     $MODULE_ARC = $CPAN::Config->{keep_source_where} . '/authors/id/' . $MODULE;
 
@@ -67,16 +67,12 @@ if (ref($mo) eq 'CPAN::Distribution') {
 } else {
     $MODULE_ARC = $CPAN::Config->{keep_source_where} . '/authors/id/' . $mo->cpan_file;
 }
-my $MODULE_DIR = $CPAN::Config->{build_dir} . "/" . (fileparse($MODULE_ARC, qr/\.tar\.gz/o))[0];
+$MODULE_DIR = $CPAN::Config->{build_dir} . "/" . (fileparse($MODULE_ARC, qr/\.tar\.gz/o))[0];
 
 # LEGACY...
 chdir $pwd;
 
-my ($yml, $deps, $MODULE_NAME);
-for (0 .. 1) {
-    ($yml, $deps, $MODULE_DIR, $MODULE_NAME) = parse_Meta($MODULE_DIR, $MODULE_ARC);
-    last if ($yml && $deps);
-}
+($yml, $deps, $MODULE_DIR, $MODULE_NAME) = parse_Meta($MODULE_DIR, $MODULE_ARC);
 if (! $yml || ! $deps) {
     print STDERR "\033[1mCannot find ${MODULE}'s dependencies.\033[m\n";
     exit 1;
@@ -93,6 +89,10 @@ my $ARCHITECTURE = ($#xs >= 0) ? 'any' : 'all';
 #####################
 # make .orig.tar.gz #
 #####################
+if (! $yml->{name}) {
+    print STDERR "\033[1mCannot find ${MODULE}'s name in META.\033[m\n";
+    exit 1;
+}
 $yml->{name} =~ s/_/-/g;
 
 my $base_dir = $MODULE_PREFIX . lc($yml->{name}) . $MODULE_SUFFIX . "-" . $yml->{version};
@@ -418,7 +418,8 @@ sub parse_Meta {
 	$module_dir = $ymls[0];
 	$module_dir =~ s/META\.(yml|json)$//;
 
-	($yml, $deps) = parse_Makefile($module_dir);
+	($yml, $deps, $module_dir, $module_name) = parse_Meta($module_dir, $module_arc);
+	($yml, $deps) = parse_Makefile($module_dir) unless $yml;
     }
     ($yml, $deps, $module_dir, $module_name);
 }
