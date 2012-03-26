@@ -12,7 +12,7 @@ use File::Find;
 use Module::Depends;
 use Data::Dumper;
 
-my $VERSION = '1.3.9';
+my $VERSION = '1.3.10';
 
 my $MODULE_PREFIX = 'lib';
 my $MODULE_SUFFIX = '-perl';
@@ -163,7 +163,7 @@ if ($yml->{generated_by} =~ /Module::Build/o || exists $yml->{build_requires}->{
     $MODULE_INSTALL = '$(MAKE) -C $(BUILDDIR) install DESTDIR=$(CURDIR)/debian/$(PACKAGE) INSTALLDIRS=vendor';
 }
 if ($manual) {
-    $MANUAL_INSTALL  = 'mkdir -p $(CURDIR)/debian/$(PACKAGE)-man/usr/share; ';
+    $MANUAL_INSTALL  = "\t" . 'mkdir -p $(CURDIR)/debian/$(PACKAGE)-man/usr/share; ';
     $MANUAL_INSTALL .= 'mv $(CURDIR)/debian/$(PACKAGE)/usr/share/man $(CURDIR)/debian/$(PACKAGE)-man/usr/share';
 }
 

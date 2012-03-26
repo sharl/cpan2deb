@@ -55,7 +55,7 @@ install: build
 
 	# Add here commands to install the package into debian/$(PACKAGE).
 	__MODULE_INSTALL__
-	__MANUAL_INSTALL__
+__MANUAL_INSTALL__
 
 	# remove perllocal.pod, .packlist and empty directory
 	find $(CURDIR)/debian/$(PACKAGE) -name perllocal.pod -or -name .packlist | xargs rm -f
