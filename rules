@@ -29,7 +29,9 @@ configure-stamp:
 	(cd $(BUILDDIR); perl __MODULE_MAKE__)
 	touch $@
 
-build: build-stamp
+build: build-arch build-indep
+build-arch: build-stamp
+build-indep: build-stamp
 build-stamp: extract-stamp configure-stamp 
 	dh_testdir
 

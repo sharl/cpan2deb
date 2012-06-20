@@ -12,7 +12,7 @@ use File::Find;
 use Module::Depends;
 use Data::Dumper;
 
-my $VERSION = '1.3.10';
+my $VERSION = '1.3.11';
 
 my $MODULE_PREFIX = 'lib';
 my $MODULE_SUFFIX = '-perl';
@@ -210,6 +210,7 @@ watch.ex
 foreach my $rm_file (@rm_files) {
     unlink "debian/" . $rm_file;
 }
+unlink "debian/$MODULE_FILENAME.cron.d.ex";
 unlink "debian/$MODULE_FILENAME-default.ex";
 unlink "debian/$MODULE_FILENAME.default.ex";
 unlink "debian/$MODULE_FILENAME.doc-base.EX";
@@ -377,6 +378,7 @@ if ($authors && $authors ne 'unknown') {
     warn "\033[1mAuthors is not defined.\033[m\n";
 }
 $buffer =~ s/\n\# Please also look if there.*$//s;
+$buffer =~ s/<years>//g;
 open(my $fd, '>', $base_dir . "/debian/copyright");
 print $fd $buffer;
 close($fd);
