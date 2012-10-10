@@ -356,12 +356,12 @@ if (ref($mo) eq 'CPAN::Distribution') {
 }
 my @resources = ();
 foreach my $key (keys %{$yml->{resources}}) {
-    push @resources, "$key $yml->{resources}->{$key}";
+    push @resources, "\t$key: $yml->{resources}->{$key}";
 }
 my $resources = join("\n", @resources);
 foreach my $lines (@buffer) {
     if ($resources) {
-	$lines =~ s,<(url://example.com|fill in ftp site)>,<$dl_file>\n\n$resources,;
+	$lines =~ s,<(url://example.com|fill in ftp site)>,<$dl_file>\n$resources,;
     } else {
 	$lines =~ s,<(url://example.com|fill in ftp site)>,<$dl_file>,;
     }
