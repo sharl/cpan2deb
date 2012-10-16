@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 
 use strict;
-use File::Basename;
+use File::Basename qw(basename fileparse);
 use Getopt::Long;
 use CPAN;
 use File::Path qw(mkpath);
@@ -409,16 +409,19 @@ sub parse_Meta {
     } else {
 	# build_dir に META があるかもしれないので試す
 
+	opendir my $dir, $CPAN::Config->{build_dir};
+	my $tmpdir = basename($module_dir);
+	my $module_tmp = $CPAN::Config->{build_dir} . '/' . (grep /^$tmpdir/, readdir($dir))[0];
+	closedir $dir;
+
 	my @ymls;
-	find( sub { push @ymls, $File::Find::name }, $CPAN::Config->{build_dir});
-	my $module_tmp = fileparse($module_arc, qr/\.tar\.gz|\.tgz/o);
+	find( sub { push @ymls, $File::Find::name }, $module_tmp );
 	@ymls = sort grep {/${module_tmp}(-.*\.(yml|json))?$/o} @ymls;
 	if ($#ymls < 0) {
 	    print STDERR "\033[1mCannot find ${MODULE}'s YAML or JSON\033[m\n";
 	    exit 1;
 	}
-	$module_dir = $ymls[0];
-	$module_dir =~ s/META\.(yml|json)$//;
+	$module_dir = $module_tmp;
 
 	($yml, $deps, $module_dir, $module_name) = parse_Meta($module_dir, $module_arc);
 	($yml, $deps) = parse_Makefile($module_dir) unless $yml;
