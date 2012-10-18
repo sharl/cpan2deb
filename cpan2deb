@@ -3,6 +3,7 @@
 use strict;
 use File::Basename qw(basename fileparse);
 use Getopt::Long;
+use Module::CoreList;
 use CPAN;
 use File::Path qw(mkpath);
 use File::Copy;
@@ -49,6 +50,9 @@ my $pwd = $ENV{PWD};
 my $MODULE_BASE;
 if ($MODULE =~ m,^http://search.cpan.org/CPAN/authors/id/(.*)$,o) {
     $MODULE_BASE = $MODULE = $1;
+}
+if ($Module::CoreList::version{$]}{$MODULE}) {
+    die "\033[1m$MODULE is bundled.\033[m\n";
 }
 my $mo = CPAN::Shell->expandany($MODULE);
 if (! defined($mo)) {
@@ -481,8 +485,13 @@ sub lex_depends {
     foreach my $module (sort keys %$Depends) {
 	my $mod = $module;
 	if ($mod ne 'perl') {
-	    my $is_core = `corelist $module`;
-	    next if ($is_core !~ /not in CORE/o);
+	    my $ver = $Module::CoreList::version{$]}{$module};
+	    if ($ver) {
+		if ($Depends->{$module} > $ver) {
+		    warn "\033[1m$module is bundled $ver but $Depends->{$module} required.\033[m\n";
+		}
+		next;
+	    }
 
 	    my $file = CPAN::Shell->expand("Module", $mod)->cpan_file;
 	    $file = basename($file);
