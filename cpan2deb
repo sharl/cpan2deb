@@ -525,6 +525,7 @@ sub lex_depends {
 	} else {
 	    if ($Depends->{$module}) {
 		# ad hoc: perl version to human readable
+		$Depends->{$module} =~ s/^v//;
 		if (my @ver = $Depends->{$module} =~ /(\d+)\.(\d{3})(\d{3})?$/o) {
 		    $Depends->{$module} = join('.', map {s/^0+(\d+)$/$1/; $_ ||= 0} @ver);
 		}
