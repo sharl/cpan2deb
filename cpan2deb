@@ -479,11 +479,11 @@ sub lex_depends {
 	if ($mod ne 'perl') {
 	    my $ver = $Module::CoreList::version{$]}{$module};
 	    if ($ver) {
-		if ($Depends->{$module} && $Depends->{$module} cmp $ver) {
+		my $cmp = compare_version($ver, $Depends->{$module});
+		if ($Depends->{$module} && $cmp) {
 		    warn "\033[1m$module is bundled $ver but $Depends->{$module} required.\033[m\n";
 		}
-		next if $Depends->{$module} == 0 # core $module required but version not specified
-		    || $Depends->{$module} eq $ver; # core $module required but version is same
+		next if $Depends->{$module} == 0 || !$cmp; # core $module required but version not specified or is GE
 	    }
 
 	    my $file = CPAN::Shell->expand("Module", $mod)->cpan_file;
@@ -540,4 +540,28 @@ sub lex_depends {
     }
     $Depends = join(", ", @Depends);
     $Depends;
+}
+
+# return true if $inst_version is less than $version
+# from App::cpanoutdated
+sub compare_version {
+    my ($inst_version, $version) = @_;
+    return 0 if $inst_version eq $version;
+
+    my $inst_version_obj = eval { version->new($inst_version) } || version->new(permissive_filter($inst_version));
+    my $version_obj      = eval { version->new($version) } || version->new(permissive_filter($version));
+
+    return $inst_version_obj < $version_obj ? 1 : 0;
+}
+
+# for broken packages.
+sub permissive_filter {
+    local $_ = $_[0];
+    s/^[Vv](\d)/$1/;                   # Bioinf V2.0
+    s/^(\d+)_(\d+)$/$1.$2/;            # VMS-IndexedFile 0_02
+    s/-[a-zA-Z]+$//;                   # Math-Polygon-Tree 0.035-withoutworldwriteables
+    s/([a-j])/ord($1)-ord('a')/gie;    # DBD-Solid 0.20a
+    s/[_h-z-]/./gi;                    # makepp 1.50.2vs.070506
+    s/\.{2,}/./g;
+    $_;
 }
