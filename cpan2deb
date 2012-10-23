@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 use File::Basename qw(basename fileparse);
 use Getopt::Long;
 use Module::CoreList;
@@ -20,23 +21,17 @@ my $MODULE_SUFFIX = '-perl';
 
 my $RULES = '/usr/share/cpan2deb/rules';
 
-my $version = undef;
-my $notest  = undef;
-my $manual  = undef;
-my $quilt   = undef;
-my @authors = ();
-
 sub usage {
     print STDERR "usage: " . basename($0) . " [-v] [-n] [-m] [-q] [-r <rules file>] [-a author] <module name | URL>\n";
     exit 1;
 }
 GetOptions(
-    "version"  => \$version,
-    "notest"   => \$notest,
-    "manual"   => \$manual,
-    "rules=s"  => \$RULES,  
-    "quilt"    => \$quilt,
-    "author=s" => \@authors,
+    "version"  => \my $version,
+    "notest"   => \my $notest,
+    "manual"   => \my $manual,
+    "rules=s"  => \$RULES,
+    "quilt"    => \my $quilt,
+    "author=s" => \my @authors,
     );
 if ($version) {
     print STDERR basename($0) . " " . $VERSION . "\n";
@@ -50,9 +45,6 @@ my $pwd = $ENV{PWD};
 my $MODULE_BASE;
 if ($MODULE =~ m,^http://search.cpan.org/CPAN/authors/id/(.*)$,o) {
     $MODULE_BASE = $MODULE = $1;
-}
-if ($Module::CoreList::version{$]}{$MODULE}) {
-    die "\033[1m$MODULE is bundled.\033[m\n";
 }
 my $mo = CPAN::Shell->expandany($MODULE);
 if (! defined($mo)) {
@@ -113,7 +105,7 @@ chdir $pwd;
 if (! -d $upstream_dir) {
     eval { mkpath $upstream_dir; };
     if ($@) {
-	print STDERRR $@;
+	print STDERR $@;
 	exit 1;
     }
 }
@@ -242,15 +234,15 @@ if ($ARCHITECTURE eq 'all') {
     $buffer =~ s/(\# Build architecture-)(dependent files here.\nbinary-)arch(: build install)\n\tdh_testdir/$1in$2indep$3/so;
 }
 
-open(my $fd, '>', $base_dir . "/debian/rules");
+open($fd, '>', $base_dir . "/debian/rules");
 print $fd $buffer;
 close($fd);
 
 ####################
 # modify changelog #
 ####################
-open(my $fd, $base_dir . "/debian/changelog");
-my @buffer = <$fd>;
+open($fd, $base_dir . "/debian/changelog");
+@buffer = <$fd>;
 close($fd);
 
 my $codename = (split(/:/, `lsb_release -c`))[1];
@@ -260,9 +252,9 @@ foreach my $line (@buffer) {
     $line =~ s/^$MODULE_FILENAME \($yml->{version}-1\) unstable/$MODULE_FILENAME ($yml->{version}-0ubuntu1) $codename/;
     $line =~ s/(Initial release).*/$1/;
 }
-my $buffer = join('', @buffer);
+$buffer = join('', @buffer);
 
-open(my $fd, '>', $base_dir . "/debian/changelog");
+open($fd, '>', $base_dir . "/debian/changelog");
 print $fd $buffer;
 close($fd);
 
@@ -270,7 +262,7 @@ close($fd);
 # create source/format #
 ########################
 mkdir $base_dir . '/debian/source', 0755;
-open(my $fd, '>', $base_dir . "/debian/source/format");
+open($fd, '>', $base_dir . "/debian/source/format");
 if ($quilt) {
     print $fd "3.0 (quilt)\n";
 } else {
@@ -305,8 +297,8 @@ if ($yml->{recommends}) {
     }
 }
 
-open(my $fd, $base_dir . "/debian/control") || die $!;
-my @buffer = <$fd>;
+open($fd, $base_dir . "/debian/control") || die $!;
+@buffer = <$fd>;
 close($fd);
 
 my $tmp_depends = $ARCHITECTURE eq 'any'
@@ -323,7 +315,7 @@ foreach my $lines (@buffer) {
     $lines =~ s/^(Description): .*$/$1: $yml->{abstract}/;
     $lines =~ s/^ <insert long description, indented with spaces>/ This package provides $MODULE perl $distribution_type./;
 }
-my $buffer = join('', @buffer);
+$buffer = join('', @buffer);
 if ($yml->{resources}->{homepage}) {
     $buffer =~ s/(Homepage): <insert the upstream URL, if relevant>/$1: $yml->{resources}->{homepage}/;
 } else {
@@ -341,15 +333,15 @@ EOF
 ;
 }
 
-open(my $fd, '>', $base_dir . "/debian/control");
+open($fd, '>', $base_dir . "/debian/control");
 print $fd $buffer;
 close($fd);
 
 ####################
 # change copyright #
 ####################
-open(my $fd, $base_dir . "/debian/copyright") || die $!;
-my @buffer = <$fd>;
+open($fd, $base_dir . "/debian/copyright") || die $!;
+@buffer = <$fd>;
 close($fd);
 
 my $dl_file;
@@ -370,7 +362,7 @@ foreach my $lines (@buffer) {
 	$lines =~ s,<(url://example.com|fill in ftp site)>,<$dl_file>,;
     }
 }
-my $buffer = join('', @buffer);
+$buffer = join('', @buffer);
 my $authors = ref($yml->{author}) eq 'ARRAY' ? join("\n    ", @{$yml->{author}}) : $yml->{author};
 if ($#authors >= 0) {
     $authors = join("\n    ", @authors);
@@ -383,7 +375,7 @@ if ($authors && $authors ne 'unknown') {
 }
 $buffer =~ s/\n\# Please also look if there.*$//s;
 $buffer =~ s/<years>//g;
-open(my $fd, '>', $base_dir . "/debian/copyright");
+open($fd, '>', $base_dir . "/debian/copyright");
 print $fd $buffer;
 close($fd);
 
