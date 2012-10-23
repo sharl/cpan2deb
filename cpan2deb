@@ -273,9 +273,6 @@ close($fd);
 ##################
 # change control #
 ##################
-print Dumper $deps;
-exit;
-
 my $Build_Depends = ();
 if ($deps->{build_requires}) {
     $Build_Depends = $deps->{build_requires};
