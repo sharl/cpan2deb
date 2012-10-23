@@ -226,7 +226,7 @@ foreach my $line (@buffer) {
     $line =~ s/__MODULE_MAKE__/$MODULE_MAKE/g;
     $line =~ s/__MODULE_BUILD__/$MODULE_BUILD/g;
     $line =~ s/__MODULE_INSTALL__/$MODULE_INSTALL/g;
-    $line =~ s/__MANUAL_INSTALL__/$MANUAL_INSTALL/g;
+    $line =~ s/__MANUAL_INSTALL__/$MANUAL_INSTALL/g if defined $MANUAL_INSTALL;
 }
 my $buffer = join('', @buffer);
 if ($ARCHITECTURE eq 'all') {
@@ -479,10 +479,10 @@ sub lex_depends {
 	if ($mod ne 'perl') {
 	    my $ver = $Module::CoreList::version{$]}{$module};
 	    if ($ver) {
-		if ($Depends->{$module} > $ver) {
+		if ($Depends->{$module} && $Depends->{$module} cmp $ver) {
 		    warn "\033[1m$module is bundled $ver but $Depends->{$module} required.\033[m\n";
 		}
-		next;
+		next if $Depends->{$module} == 0; # core $module required but version not specified
 	    }
 
 	    my $file = CPAN::Shell->expand("Module", $mod)->cpan_file;
