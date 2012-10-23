@@ -140,7 +140,7 @@ my $MODULE_VERSION = $yml->{version};
 my $MODULE_MAKE;
 my $MODULE_BUILD;
 my $MODULE_INSTALL;
-my $MANUAL_INSTALL = undef;
+my $MANUAL_INSTALL = '';
 if ($yml->{generated_by} =~ /Module::Build/o || exists $yml->{build_requires}->{'Module::Build'}) {
     $MODULE_MAKE    = 'Build.PL --prefix /usr --bindoc /usr/share --libdoc /usr/share --installdirs vendor';
     if ($notest) {
@@ -226,7 +226,7 @@ foreach my $line (@buffer) {
     $line =~ s/__MODULE_MAKE__/$MODULE_MAKE/g;
     $line =~ s/__MODULE_BUILD__/$MODULE_BUILD/g;
     $line =~ s/__MODULE_INSTALL__/$MODULE_INSTALL/g;
-    $line =~ s/__MANUAL_INSTALL__/$MANUAL_INSTALL/g if defined $MANUAL_INSTALL;
+    $line =~ s/__MANUAL_INSTALL__/$MANUAL_INSTALL/g;
 }
 my $buffer = join('', @buffer);
 if ($ARCHITECTURE eq 'all') {
@@ -273,6 +273,9 @@ close($fd);
 ##################
 # change control #
 ##################
+print Dumper $deps;
+exit;
+
 my $Build_Depends = ();
 if ($deps->{build_requires}) {
     $Build_Depends = $deps->{build_requires};
