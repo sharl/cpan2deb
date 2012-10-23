@@ -482,7 +482,8 @@ sub lex_depends {
 		if ($Depends->{$module} && $Depends->{$module} cmp $ver) {
 		    warn "\033[1m$module is bundled $ver but $Depends->{$module} required.\033[m\n";
 		}
-		next if $Depends->{$module} == 0; # core $module required but version not specified
+		next if $Depends->{$module} == 0 # core $module required but version not specified
+		    || $Depends->{$module} eq $ver; # core $module required but version is same
 	    }
 
 	    my $file = CPAN::Shell->expand("Module", $mod)->cpan_file;
