@@ -14,7 +14,9 @@ use File::Find;
 use Module::Depends;
 use Data::Dumper;
 
-my $VERSION = '1.3.11';
+my $prog = basename($0);
+
+my $VERSION = '1.3.12';
 
 my $MODULE_PREFIX = 'lib';
 my $MODULE_SUFFIX = '-perl';
@@ -22,17 +24,34 @@ my $MODULE_SUFFIX = '-perl';
 my $RULES = '/usr/share/cpan2deb/rules';
 
 sub usage {
-    print STDERR "usage: " . basename($0) . " [-v] [-n] [-m] [-q] [-r <rules file>] [-a author] <module name | URL>\n";
+    print STDERR <<EOF;
+usage: $prog [options] <module name | URL>
+
+options
+
+-a --author author	set author(s)	ex) -a "Marc Lehmann <schmorp\@schmorp.de>"
+-h --help		show this message
+-m --manual		set to ${MODULE_PREFIX}module${MODULE_SUFFIX} and ${MODULE_PREFIX}module-man${MODULE_SUFFIX}
+-n --notest		set to no \'make test\' running
+-q --quilt		set quilt format to debian/source/format
+-r --rules file		use file for debian/rules template
+-u --upstream version	set package version
+-v --version		print version and exit
+
+EOF
+;
     exit 1;
 }
 GetOptions(
-    "version"  => \my $version,
-    "notest"   => \my $notest,
-    "manual"   => \my $manual,
-    "rules=s"  => \$RULES,
-    "quilt"    => \my $quilt,
-    "author=s" => \my @authors,
-    );
+    "version"    => \my $version,
+    "notest"     => \my $notest,
+    "manual"     => \my $manual,
+    "rules=s"    => \$RULES,
+    "upstream=s" => \my $upstream,
+    "quilt"      => \my $quilt,
+    "author=s"   => \my @authors,
+    "help"       => sub { usage() },
+    ) or usage();
 if ($version) {
     print STDERR basename($0) . " " . $VERSION . "\n";
     exit;
@@ -91,11 +110,12 @@ if (! $yml->{name}) {
 }
 $yml->{name} =~ s/_/-/g;
 
-my $base_dir = $MODULE_PREFIX . lc($yml->{name}) . $MODULE_SUFFIX . "-" . $yml->{version};
+my $upstream_version = $upstream ? ($upstream =~ /:/o ? (split(/:/o, $upstream, 2))[1] : $upstream) : $yml->{version};
+my $base_dir = $MODULE_PREFIX . lc($yml->{name}) . $MODULE_SUFFIX . "-" . $upstream_version;
 if ($yml->{name} =~ /^$MODULE_PREFIX.*$MODULE_SUFFIX/o) {
-    $base_dir = lc($yml->{name}) . "-" . $yml->{version};
+    $base_dir = lc($yml->{name}) . "-" . $upstream_version;
 } elsif (lc($yml->{name}) =~ /^$MODULE_PREFIX/o) {
-    $base_dir = lc($yml->{name}) . $MODULE_SUFFIX . "-" . $yml->{version};
+    $base_dir = lc($yml->{name}) . $MODULE_SUFFIX . "-" . $upstream_version;
 }
 my $upstream_dir = $base_dir . "/upstream/" ;
 
@@ -112,11 +132,11 @@ if (! -d $upstream_dir) {
 
 copy($MODULE_ARC, $upstream_dir) or die $!;
 
-my $orig_tar_gz_file = $MODULE_PREFIX . lc($yml->{name}) . $MODULE_SUFFIX . "_" . $yml->{version} . ".orig.tar.gz";
+my $orig_tar_gz_file = $MODULE_PREFIX . lc($yml->{name}) . $MODULE_SUFFIX . "_" . $upstream_version . ".orig.tar.gz";
 if ($yml->{name} =~ /^$MODULE_PREFIX.*$MODULE_SUFFIX/o) {
-    $orig_tar_gz_file = lc($yml->{name}) . "_" . $yml->{version} . ".orig.tar.gz";
+    $orig_tar_gz_file = lc($yml->{name}) . "_" . $upstream_version . ".orig.tar.gz";
 } elsif (lc($yml->{name}) =~ /^lib/o) {
-    $orig_tar_gz_file = lc($yml->{name}) . $MODULE_SUFFIX . "_" . $yml->{version} . ".orig.tar.gz";
+    $orig_tar_gz_file = lc($yml->{name}) . $MODULE_SUFFIX . "_" . $upstream_version . ".orig.tar.gz";
 }
 
 if (! -f $orig_tar_gz_file) {
@@ -142,19 +162,19 @@ my $MODULE_BUILD;
 my $MODULE_INSTALL;
 my $MANUAL_INSTALL = '';
 if ($yml->{generated_by} =~ /Module::Build/o || exists $yml->{build_requires}->{'Module::Build'}) {
-    $MODULE_MAKE    = 'Build.PL --prefix /usr --bindoc /usr/share --libdoc /usr/share --installdirs vendor';
+    $MODULE_MAKE = 'Build.PL --prefix /usr --bindoc /usr/share --libdoc /usr/share --installdirs vendor';
     if ($notest) {
-	$MODULE_BUILD   = '(cd $(BUILDDIR); ./Build)';
+	$MODULE_BUILD = '(cd $(BUILDDIR); ./Build)';
     } else {
-	$MODULE_BUILD   = '(cd $(BUILDDIR); ./Build; ./Build test)';
+	$MODULE_BUILD = '(cd $(BUILDDIR); ./Build; ./Build test)';
     }
     $MODULE_INSTALL = '(cd $(BUILDDIR); ./Build install --installdirs vendor --destdir $(CURDIR)/debian/$(PACKAGE))';
 } else {
-    $MODULE_MAKE    = 'Makefile.PL installdirs=vendor';
+    $MODULE_MAKE = 'Makefile.PL installdirs=vendor';
     if ($notest) {
-	$MODULE_BUILD   = '$(MAKE) -C $(BUILDDIR)';
+	$MODULE_BUILD = '$(MAKE) -C $(BUILDDIR)';
     } else {
-	$MODULE_BUILD   = '$(MAKE) -C $(BUILDDIR); $(MAKE) -C $(BUILDDIR) test';
+	$MODULE_BUILD = '$(MAKE) -C $(BUILDDIR); $(MAKE) -C $(BUILDDIR) test';
     }
     $MODULE_INSTALL = '$(MAKE) -C $(BUILDDIR) install DESTDIR=$(CURDIR)/debian/$(PACKAGE) INSTALLDIRS=vendor';
 }
@@ -174,7 +194,7 @@ if (! $yml->{abstract} || $yml->{abstract} eq 'unknown') {
 
 chdir $base_dir;
 my @licenses = qw(gpl lgpl artistic bsd);
-my $license = $yml->{license} eq 'perl' ? 'artistic' : $yml->{license};
+my $license = (! $yml->{license} || $yml->{license} eq 'perl') ? 'artistic' : $yml->{license};
 
 if (! grep /$license/, @licenses) {
     $license = 'artistic';
@@ -249,7 +269,11 @@ my $codename = (split(/:/, `lsb_release -c`))[1];
 $codename =~ s/\s+//g;
 
 foreach my $line (@buffer) {
-    $line =~ s/^$MODULE_FILENAME \($yml->{version}-1\) unstable/$MODULE_FILENAME ($yml->{version}-0ubuntu1) $codename/;
+    if ($upstream) {
+	$line =~ s/^$MODULE_FILENAME \(${upstream_version}-1\) unstable/$MODULE_FILENAME (${upstream}-0ubuntu1) $codename/;
+    } else {
+	$line =~ s/^$MODULE_FILENAME \($yml->{version}-1\) unstable/$MODULE_FILENAME ($yml->{version}-0ubuntu1) $codename/;
+    }
     $line =~ s/(Initial release).*/$1/;
 }
 $buffer = join('', @buffer);
@@ -479,11 +503,11 @@ sub lex_depends {
 	if ($mod ne 'perl') {
 	    my $ver = $Module::CoreList::version{$]}{$module};
 	    if ($ver) {
-		my $cmp = compare_version($ver, $Depends->{$module});
+		my $cmp = compare_version($ver, $Depends->{$module} || 0);
 		if ($Depends->{$module} && $cmp) {
 		    warn "\033[1m$module is bundled $ver but $Depends->{$module} required.\033[m\n";
 		}
-		next if $Depends->{$module} == 0 || !$cmp; # core $module required but version not specified or is GE
+		next if ($Depends->{$module} || 0) == 0 || !$cmp; # core $module required but version not specified or is GE
 	    }
 
 	    my $file = CPAN::Shell->expand("Module", $mod)->cpan_file;
@@ -520,7 +544,7 @@ sub lex_depends {
 		# ad hoc: perl version to human readable
 		$Depends->{$module} =~ s/^v//;
 		if (my @ver = $Depends->{$module} =~ /(\d+)\.(\d{3})(\d{3})?$/o) {
-		    $Depends->{$module} = join('.', map {s/^0+(\d+)$/$1/; $_ ||= 0} @ver);
+		    $Depends->{$module} = join('.', map {$_ && s/^0+(\d+)$/$1/; $_ ||= 0} @ver);
 		}
 		$Depends{$mod} = "(>= $Depends->{$module})";
 	    } else {
