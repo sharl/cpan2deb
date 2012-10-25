@@ -6,7 +6,7 @@ use File::Basename qw(basename fileparse);
 use Getopt::Long;
 use Module::CoreList;
 use CPAN;
-use File::Path qw(mkpath);
+use File::Path qw(make_path);
 use File::Copy;
 use Parse::CPAN::Meta;
 use Archive::Tar;
@@ -35,6 +35,7 @@ options
 -n --notest		set to no \'make test\' running
 -q --quilt		set quilt format to debian/source/format
 -r --rules file		use file for debian/rules template
+-s --siteinstall	set install directory \'site\' instead of \'vendor\'
 -u --upstream version	set package version
 -v --version		print version and exit
 
@@ -43,14 +44,15 @@ EOF
     exit 1;
 }
 GetOptions(
-    "version"    => \my $version,
-    "notest"     => \my $notest,
-    "manual"     => \my $manual,
-    "rules=s"    => \$RULES,
-    "upstream=s" => \my $upstream,
-    "quilt"      => \my $quilt,
-    "author=s"   => \my @authors,
-    "help"       => sub { usage() },
+    "author=s"    => \my @authors,
+    "help"        => sub { usage() },
+    "manual"      => \my $manual,
+    "notest"      => \my $notest,
+    "quilt"       => \my $quilt,
+    "rules=s"     => \$RULES,
+    "siteinstall" => \my $siteinstall,
+    "upstream=s"  => \my $upstream,
+    "version"     => \my $version,
     ) or usage();
 if ($version) {
     print STDERR basename($0) . " " . $VERSION . "\n";
@@ -58,6 +60,8 @@ if ($version) {
 }
 my ($MODULE) = @ARGV;
 usage() if (! $MODULE);
+
+my $installdirs = $siteinstall ? 'site' : 'vendor';
 
 my $pwd = $ENV{PWD};
 
@@ -123,7 +127,7 @@ my $upstream_dir = $base_dir . "/upstream/" ;
 chdir $pwd;
 
 if (! -d $upstream_dir) {
-    eval { mkpath $upstream_dir; };
+    eval { make_path $upstream_dir; };
     if ($@) {
 	print STDERR $@;
 	exit 1;
@@ -162,25 +166,27 @@ my $MODULE_BUILD;
 my $MODULE_INSTALL;
 my $MANUAL_INSTALL = '';
 if ($yml->{generated_by} =~ /Module::Build/o || exists $yml->{build_requires}->{'Module::Build'}) {
-    $MODULE_MAKE = 'Build.PL --prefix /usr --bindoc /usr/share --libdoc /usr/share --installdirs vendor';
+#    $MODULE_MAKE = 'Build.PL --prefix /usr --bindoc /usr/share --libdoc /usr/share --installdirs '.$installdirs; 
+    $MODULE_MAKE = 'Build.PL --bindoc /usr/share --libdoc /usr/share --installdirs '.$installdirs;
     if ($notest) {
 	$MODULE_BUILD = '(cd $(BUILDDIR); ./Build)';
     } else {
 	$MODULE_BUILD = '(cd $(BUILDDIR); ./Build; ./Build test)';
     }
-    $MODULE_INSTALL = '(cd $(BUILDDIR); ./Build install --installdirs vendor --destdir $(CURDIR)/debian/$(PACKAGE))';
+    $MODULE_INSTALL = '(cd $(BUILDDIR); ./Build install --installdirs '.$installdirs.' --destdir $(CURDIR)/debian/$(PACKAGE))';
 } else {
-    $MODULE_MAKE = 'Makefile.PL installdirs=vendor';
+    $MODULE_MAKE = 'Makefile.PL installdirs='.$installdirs;
     if ($notest) {
 	$MODULE_BUILD = '$(MAKE) -C $(BUILDDIR)';
     } else {
 	$MODULE_BUILD = '$(MAKE) -C $(BUILDDIR); $(MAKE) -C $(BUILDDIR) test';
     }
-    $MODULE_INSTALL = '$(MAKE) -C $(BUILDDIR) install DESTDIR=$(CURDIR)/debian/$(PACKAGE) INSTALLDIRS=vendor';
+    $MODULE_INSTALL = '$(MAKE) -C $(BUILDDIR) install DESTDIR=$(CURDIR)/debian/$(PACKAGE) INSTALLDIRS='.$installdirs;
 }
 if ($manual) {
     $MANUAL_INSTALL  = "\t" . 'mkdir -p $(CURDIR)/debian/$(PACKAGE)-man/usr/share; ';
-    $MANUAL_INSTALL .= 'mv $(CURDIR)/debian/$(PACKAGE)/usr/share/man $(CURDIR)/debian/$(PACKAGE)-man/usr/share';
+    my $dir = $siteinstall ? 'local' : 'share';
+    $MANUAL_INSTALL .= 'mv $(CURDIR)/debian/$(PACKAGE)/usr/'.$dir.'/man $(CURDIR)/debian/$(PACKAGE)-man/usr/share';
 }
 
 # Check distribution type and description
@@ -350,7 +356,7 @@ if ($manual) {
 
 Package: ${MODULE_FILENAME}-man
 Architecture: all
-Depends: man
+Depends: man, \${misc:Depends}
 Description: Manual of $MODULE_NAME
  This package provides $MODULE_NAME perldoc manual.
 EOF
@@ -402,6 +408,31 @@ $buffer =~ s/<years>//g;
 open($fd, '>', $base_dir . "/debian/copyright");
 print $fd $buffer;
 close($fd);
+
+########################################
+# create lintian/$module for overrides #
+########################################
+if ($siteinstall) {
+    eval { make_path $base_dir . '/debian/lintian'; };
+    if ($@) {
+	print STDERR $@;
+	exit 1;
+    }
+    my @mods = ( $MODULE_FILENAME );
+    $manual && push @mods, "${MODULE_FILENAME}-man";
+    foreach my $mod (@mods) {
+	open($fd, '>', $base_dir . "/debian/lintian/$mod");
+	print $fd "$mod binary: dir-in-usr-local usr/local/*\n";
+	print $fd "$mod binary: file-in-usr-local usr/local/*\n";
+	print $fd "$mod binary: file-in-unusual-dir usr/local/*\n";
+	close($fd);
+
+	# for dh_install
+	open($fd, '>', $base_dir . "/debian/$mod.install");
+	print $fd "debian/lintian/$mod usr/share/lintian/overrides\n";
+	close($fd);
+    }
+}
 
 ############################################################
 
