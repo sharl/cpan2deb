@@ -311,7 +311,10 @@ if ($deps->{build_requires}) {
 }
 # avoid Module::Depends bug
 if ($yml->{configure_requires}) {
-    map { $Build_Depends->{$_} = $yml->{configure_requires}->{$_} } keys %$yml->{configure_requires};
+    map { $Build_Depends->{$_} = $yml->{configure_requires}->{$_} } keys %{$yml->{configure_requires}};
+}
+if (!$notest && $yml->{test_requires}) {
+    map { $Build_Depends->{$_} = $yml->{test_requires}->{$_} } keys %{$yml->{test_requires}};
 }
 $Build_Depends = lex_depends($Build_Depends);
 warn "Build-Depends: " . $Build_Depends . "\n" if $Build_Depends;
