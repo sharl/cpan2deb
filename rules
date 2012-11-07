@@ -14,7 +14,7 @@ P_SUFFIX = __SUFFIX__
 
 MODULE   = __MODULE__
 ARCHIVE  = $(subst ::,-,$(MODULE))
-PACKAGE  = $(addsuffix $(P_SUFFIX), $(addprefix $(P_PREFIX), $(shell echo $(ARCHIVE) | tr A-Z a-z)))
+PACKAGE  = $(addsuffix $(P_SUFFIX), $(addprefix $(P_PREFIX), $(shell echo $(ARCHIVE) | tr A-Z. a-z-)))
 VERSION  = $(shell echo $(CURDIR)/upstream/* | sed -e 's/^.*$(ARCHIVE)-\(.*\)\.tar.*/\1/p;d')
 BUILDDIR = $(CURDIR)/$(ARCHIVE)-$(VERSION)
 
