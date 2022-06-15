@@ -393,9 +393,9 @@ close($fd);
 
 my $dl_file;
 if (ref($mo) eq 'CPAN::Distribution') {
-    $dl_file = 'http://search.cpan.org/CPAN/authors/id/' . $MODULE_BASE;
+    $dl_file = 'https://cpan.metacpan.org/authors/id/' . $MODULE_BASE;
 } else {
-    $dl_file = (fileparse('http://search.cpan.org/CPAN/authors/id/' . $mo->cpan_file))[1];
+    $dl_file = (fileparse('https://cpan.metacpan.org/authors/id/' . $mo->cpan_file))[1];
 }
 my @resources = ();
 foreach my $key (keys %{$yml->{resources}}) {
