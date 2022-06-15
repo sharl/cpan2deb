@@ -112,7 +112,7 @@ if (! $yml || ! $deps) {
 my @xs;
 find( sub { push @xs, $File::Find::name }, $MODULE_DIR);
 @xs = grep {/\.xs$/o} @xs;
-my $ARCHITECTURE = ($#xs >= 0) ? 'any' : 'all';
+my $ARCHITECTURE = ($#xs >= 0) ? 'any' : 'any';
 
 #####################
 # make .orig.tar.gz #
