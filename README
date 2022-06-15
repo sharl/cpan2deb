@@ -1,4 +1,4 @@
-cpan2deb - yet another CPAN packager for Ubuntu
+cpan2deb - yet another CPAN packager for Ubuntu/Debian
 
 Copyright(C) Sharl Morlaroll <sharl@hauN.org>
 
@@ -10,10 +10,6 @@ Copyright(C) Sharl Morlaroll <sharl@hauN.org>
 2. rules copy to /usr/share/cpan2deb/rules.
 3. Let's try.
 
-$ mkdir ~/JSON-XS
-$ cd ~/JSON-XS
-$ cpan2deb JSON::XS
-$ cd libjson-xs-perl-*
-$ debuild -uc -us
+$ cpan2deb common::sense
 
 4. Done.

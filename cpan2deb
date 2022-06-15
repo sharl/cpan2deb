@@ -6,7 +6,7 @@ use File::Basename qw(basename fileparse);
 use Getopt::Long;
 use Module::CoreList;
 use CPAN;
-use File::Path qw(make_path);
+use File::Path qw(make_path rmtree);
 use File::Copy;
 use Parse::CPAN::Meta;
 use Archive::Tar;
@@ -63,7 +63,14 @@ usage() if (! $MODULE);
 
 my $installdirs = $siteinstall ? 'site' : 'vendor';
 
-my $pwd = $ENV{PWD};
+##################################
+# create work directory and into #
+mkdir $MODULE;
+chdir $MODULE;
+##################################
+
+my $cwd = $ENV{PWD};
+my $pwd = "$cwd/$MODULE";
 
 my $MODULE_BASE;
 if ($MODULE =~ m,^http://search.cpan.org/CPAN/authors/id/(.*)$,o) {
@@ -206,7 +213,7 @@ if (! grep /$license/, @licenses) {
     $license = 'artistic';
 }
 
-system "yes | dh_make -s -c \"$license\" -f ../$orig_tar_gz_file";
+system "dh_make -y -s -c \"$license\"";
 
 my @rm_files = qw(
 README.Debian
@@ -227,6 +234,7 @@ postinst.ex
 postrm.ex
 preinst.ex
 prerm.ex
+salsa-ci.yml.ex
 watch.ex
 );
 foreach my $rm_file (@rm_files) {
@@ -440,6 +448,26 @@ if ($siteinstall) {
 	close($fd);
     }
 }
+
+###########
+# debuild #
+###########
+chdir $base_dir;
+system "debuild -uc -us";
+
+#################
+# copy packages #
+#################
+chdir $pwd;
+foreach my $deb (glob "*.deb") {
+    copy $deb, $cwd;
+}
+
+############
+# clean up #
+############
+chdir $cwd;
+rmtree $MODULE;
 
 ############################################################
 
