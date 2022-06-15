@@ -79,6 +79,8 @@ if ($MODULE =~ m,^http://search.cpan.org/CPAN/authors/id/(.*)$,o) {
 my $mo = CPAN::Shell->expandany($MODULE);
 if (! defined($mo)) {
     print STDERR "$MODULE missing\n";
+    chdir $cwd;
+    rmdir $MODULE;
     exit 1;
 }
 $mo->get();
