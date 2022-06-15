@@ -174,7 +174,12 @@ my $MODULE_MAKE;
 my $MODULE_BUILD;
 my $MODULE_INSTALL;
 my $MANUAL_INSTALL = '';
-if ($yml->{generated_by} =~ /Module::Build/o || exists $yml->{build_requires}->{'Module::Build'}) {
+# test Build.PL
+my $BUILDPL = 0;
+foreach my $k (keys %{$yml->{configure_requires}}, keys %{$yml->{build_requires}}) {
+    $BUILDPL = 1 if $k =~ /Module::Build/o;
+}
+if ($yml->{generated_by} =~ /Module::Build/o || $BUILDPL) {
 #    $MODULE_MAKE = 'Build.PL --prefix /usr --bindoc /usr/share --libdoc /usr/share --installdirs '.$installdirs; 
     $MODULE_MAKE = 'Build.PL --bindoc /usr/share --libdoc /usr/share --installdirs '.$installdirs;
     if ($notest) {
