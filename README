@@ -16,3 +16,7 @@ $ echo | cpan
 4. Let's try.
 
 $ cpan2deb common::sense
+
+or
+
+$ make MODULE=common::sense
