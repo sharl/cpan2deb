@@ -8,8 +8,11 @@ Copyright(C) Sharl Morlaroll <sharl@hauN.org>
 
 1. cpan2deb copy to /usr/bin/cpan2deb.
 2. rules copy to /usr/share/cpan2deb/rules.
-3. Let's try.
+3. install modules.
+
+$ sudo apt-get install -y build-essential dh-make devscripts libmodule-corelist-perl libmodule-depends-perl
+$ echo | cpan
+
+4. Let's try.
 
 $ cpan2deb common::sense
-
-4. Done.
