@@ -179,6 +179,7 @@ my $BUILDPL = 0;
 foreach my $k (keys %{$yml->{configure_requires}}, keys %{$yml->{build_requires}}) {
     $BUILDPL = 1 if $k =~ /Module::Build/o;
 }
+$BUILDPL = 1 if -f "$MODULE_DIR/Build.PL";
 if ($yml->{generated_by} =~ /Module::Build/o || $BUILDPL) {
 #    $MODULE_MAKE = 'Build.PL --prefix /usr --bindoc /usr/share --libdoc /usr/share --installdirs '.$installdirs; 
     $MODULE_MAKE = 'Build.PL --bindoc /usr/share --libdoc /usr/share --installdirs '.$installdirs;
